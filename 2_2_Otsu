@@ -1,0 +1,54 @@
+# Otsu thresholding step 2 (step 1 is in the Python code)
+# Read the filtered temperature matrix and calculate basic statistics
+library(readr)
+library(dplyr)
+
+input_path <- "...:/..../otsu_and_konturdet_matrix_csv_with_transf/"
+# Read all _filtered.csv files from the folder
+file_list <- list.files(path = input_path, pattern = "_filtered_ver2.csv$", full.names = TRUE)
+
+# Read data and combine into one data frame
+all_data <- lapply(file_list, function(file) {
+  data <- read_delim(file, delim = "\t", col_names = FALSE)
+  values <- as.vector(as.matrix(data))
+  clean_filename <- sub("_filtered", "", basename(file))
+  data.frame(filename = clean_filename, value = values)
+}) %>% bind_rows()
+
+# Remove NaN values and compute summary statistics
+summary_values <- all_data %>%
+  filter(!is.na(value)) %>%
+  group_by(filename) %>%
+  summarize(
+    min_value_otsu = min(value, na.rm = TRUE),             # Minimum
+    max_value_otsu = max(value, na.rm = TRUE),             # Maximum
+    median_value_otsu = median(value, na.rm = TRUE),       # Median
+    Q1_otsu = quantile(value, 0.25, na.rm = TRUE),         # First quartile (25th percentile)
+    Q3_otsu = quantile(value, 0.75, na.rm = TRUE),         # Third quartile (75th percentile)
+    P10_otsu = quantile(value, 0.10, na.rm = TRUE),        # Lower percentile (10th percentile)
+    P90_otsu = quantile(value, 0.90, na.rm = TRUE)        # Upper percentile (90th percentile)
+  ) %>%
+  mutate(across(where(is.numeric), ~round(.x, 2)))
+
+# Save the result to a CSV file
+output_file <- file.path(input_path, "otsu_results_summary.csv")
+write_csv(summary_values, output_file)
+
+# Load additional data
+termal_pics_data <- read.csv("d:/Work/Pannon_Uni_work/termal_pics_data.csv")
+otsu_stat_summary <- read.csv("d:/Work/Pannon_Uni_work/otsu_es_konturdet_matrix_csv_with_transf/otsu_results_summary.csv")
+
+# Remove the .csv extension from the filename column in otsu_stat_summary
+otsu_stat_summary$filename <- sub("\\.csv$", "", otsu_stat_summary$filename)
+
+# Remove the last 5 characters from the filename for merging
+otsu_stat_summary$filename <- substr(otsu_stat_summary$filename, 
+                                     1, nchar(otsu_stat_summary$filename) - 5)
+
+# Merge data based on File_name and filename columns
+merged_data <- termal_pics_data %>%
+  left_join(otsu_stat_summary, by = c("File_name" = "filename"))
+
+# Save the merged data to a CSV file
+write.csv(merged_data, "...:/.../termal_data_otsu_transf_and_contour.csv",
+          row.names = FALSE)
