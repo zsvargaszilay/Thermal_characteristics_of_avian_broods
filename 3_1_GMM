@@ -1,0 +1,78 @@
+library(mclust)
+library(ggplot2)
+library(reshape2)
+library(scales)
+library(dplyr)
+library(tidyr)
+
+input_folder <- "...:/temperature_data_for_pics/"  
+output_folder <- "...:/.../GMM_csv/"  
+
+# List all .txt files in the input folder
+txt_files <- list.files(input_folder, pattern = "\\.txt$", full.names = TRUE)
+
+for (file in txt_files) {
+  # Read temperature matrix from text file
+  data <- read.table(file, header = FALSE, fill = TRUE, fileEncoding = "UTF-16")
+  
+  data <- data[-(1:3), -1] # Remove header rows and the first column
+  colnames(data) <- NULL
+  
+  matrix_df <- as.matrix(data)
+  rownames(matrix_df) <- 1:nrow(matrix_df)
+  colnames(matrix_df) <- 1:ncol(matrix_df)
+  
+  mdf <- melt(matrix_df) # Convert matrix to long format
+  colnames(mdf) <- c("x", "y", "temperature")
+  mdf$temperature <- as.numeric(mdf$temperature)
+
+  # Apply Gaussian Mixture Model (GMM) with 2 clusters
+  gmm_model <- Mclust(mdf$temperature, G = 2) # 2 clusters
+  mdf$cluster <- gmm_model$classification  # Assign cluster labels
+
+  # Identify the warmer cluster (presumably the nest region)
+  cluster_means <- tapply(mdf$temperature, mdf$cluster, mean)
+  nest_cluster <- which.max(cluster_means)  # Cluster with highest mean temperature
+  
+  # Create temperature mask: keep only values from the nest cluster
+  #mdf$binary_mask <- ifelse(mdf$cluster == nest_cluster, 1, 0)
+  mdf$temperature_in_region <- ifelse(mdf$cluster == nest_cluster, mdf$temperature, NA)
+  
+  # Reshape back into matrix form for exporting
+  #binary_matrix <- dcast(mdf, x ~ y, value.var = "binary_mask")
+  #binary_matrix <- binary_matrix[,-1]  # Remove x column
+  temperature_matrix <- dcast(mdf, x ~ y, value.var = "temperature_in_region")
+  temperature_matrix <- temperature_matrix[,-1]  # Remove x column
+  
+  file_name <- tools::file_path_sans_ext(basename(file))
+  output_csv_path <- file.path(output_folder, paste0(file_name, ".csv"))
+  
+  # Save the resulting temperature matrix as CSV
+  write.csv(temperature_matrix, output_csv_path, row.names = FALSE, col.names = FALSE)
+  
+  # Optional: plot original heatmap
+  # ggplot(mdf, aes(x, y, fill = temperature)) +
+  #   geom_tile() +
+  #   scale_fill_gradient(low = "blue", high = "red") +
+  #   ggtitle("Eredeti hőtérkép") +
+  #   theme_minimal()
+  
+  # Optional: plot binary mask of the nest region
+  # plot <- ggplot(mdf, aes(x, y, fill = as.factor(cluster == nest_cluster))) +
+  #   geom_tile() +
+  #   scale_fill_manual(values = c("black", "white"), labels = c("Háttér", "Fészekalj")) +
+  #   coord_cartesian(expand = FALSE) +
+  #   theme_minimal()+
+  #   theme(
+  #     axis.title = element_blank(),  
+  #     axis.text = element_blank(),   
+  #     axis.ticks = element_blank(),  
+  #     panel.grid = element_blank(),  
+  #     legend.position = "none"        
+  #   )
+  # 
+  # file_name <- tools::file_path_sans_ext(basename(file))
+  # output_path <- file.path(output_folder, paste0(file_name, ".png"))
+  # 
+  # ggsave(output_path, plot, width = 6, height = 8, dpi = 300)
+}
