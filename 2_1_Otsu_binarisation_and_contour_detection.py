@@ -2,6 +2,7 @@ import os
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt # for visualization
+#Python script
 
 # Input: A temperature matrix from a thermal camera in CSV format
 # Output: A CSV file containing the filtered temperature matrix for one thermal image
