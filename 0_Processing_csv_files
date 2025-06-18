@@ -1,0 +1,27 @@
+# Set up folders
+input_folder <- "...:/.../csv_filtered/"   
+output_folder <- "...:/.../csvs/" 
+
+
+# Read all CSV files from the input folder
+files <- list.files(input_folder, pattern = "\\.csv$", full.names = TRUE)
+
+# Process files one by one
+for (file in files) {
+  # Extract the file name (without the path)
+  filename <- basename(file)
+  
+  #data <- read.table(file, header = FALSE, fill = TRUE, fileEncoding = "UTF-16")
+  data <- read.csv(file, header = FALSE, sep = ",", fileEncoding = "UTF-16")
+
+  # Remove the first 3 rows and the first column!!!
+  data <- data[-(1:3), -1]
+  colnames(data) <- NULL
+  
+  # Set output file path
+  output_file <- file.path(output_folder, filename)
+  
+  # Save the cleaned data to file as tab-separated, UTF-8 encoded
+  write.table(data, file = output_file, row.names = FALSE, col.names = FALSE, sep = "\t", quote = FALSE, fileEncoding = "UTF-8")
+
+}
