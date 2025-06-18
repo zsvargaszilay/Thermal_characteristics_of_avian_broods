@@ -1,0 +1,63 @@
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+Input: Raw data (e.g. Emissivity, Average T, Minimum T) from the thermal camera
+Output: termal_pics_data.csv
+
+data <- read.table("...:/.../01_all_markers_02.txt", header = FALSE, 
+                   fill = TRUE, fileEncoding = "UTF-8")
+
+data_cleaned <- data[seq(2, nrow(data), by = 2), ]
+
+data_cleaned <- data_cleaned[ ,1:8]
+
+colnames(data_cleaned) <- c("File_name", "Label", "Emissivity", "Background",
+                            "Average", "Minimum", "Maximum", "Points") 
+
+# Split the filename
+data_cleaned$Bird_box_ID <- sapply(strsplit(as.character(data_cleaned$File_name), "_"), `[`, 1)
+data_cleaned$Date <- sapply(strsplit(as.character(data_cleaned$File_name), "_"), `[`, 2)
+data_cleaned$Image_ID <- substr(data_cleaned$File_name, nchar(data_cleaned$File_name) - 7, 
+                                nchar(data_cleaned$File_name))
+data_cleaned$Bird_box_info <- str_sub(data_cleaned$File_name, 1, -10)
+data_cleaned$Bird_box_info <- sub("^[^_]*_[^_]*_", "", data_cleaned$Bird_box_info)
+#unique(data_cleaned$Bird_box_info)
+
+data_cleaned <- data_cleaned %>%
+  mutate(Location = case_when(
+    substr(Bird_box_ID, 1, 1) == "V" ~ "Veszprem",
+    substr(Bird_box_ID, 1, 2) == "Et" ~ "Veszprem",
+    substr(Bird_box_ID, 1, 2) == "Vi" ~ "Vilmapuszta",
+    substr(Bird_box_ID, 1, 1) == "T" ~ "Vilmapuszta",
+    substr(Bird_box_ID, 1, 1) == "L" ~ "Laczko",
+    substr(Bird_box_ID, 1, 1) == "F" ~ "Farkasgyepu"
+  ))
+
+#colnames(data_cleaned)
+#unique(data_cleaned$Label)
+
+data_cleaned <- data_cleaned %>%
+  group_by(Image_ID) %>%
+  summarise(
+    Bird_box_ID = first(Bird_box_ID),
+    Image_ID = first(Image_ID),
+    Year = 2024,
+    Date = first(Date),
+    Location = first(Location),
+    Emissivity = first(Emissivity),
+    Background = first(Background),
+    Centerpoint = Points[1],  
+    Hotpoint = Points[2],  
+    Coldpoint = Points[3],
+    Bird_box_info = first(Bird_box_info),
+    File_name = first(File_name)
+  )
+data_cleaned$Date
+
+data_cleaned <- data_cleaned %>%
+  separate(Date, into = c("Month", "Day"), sep = "\\.")
+
+#unique(data_cleaned$Bird_box_ID)
+
+write.csv(data_cleaned, "...:/..../termal_pics_data.csv", row.names = FALSE)
