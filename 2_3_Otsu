@@ -1,0 +1,82 @@
+library(dplyr)
+
+thermal_df <- read.csv("...:/.../termal_data_otsu_transf_and_contour.csv")
+filed_report_data <- read.csv("...:/.../Hokamera_projekt_2024.csv")
+
+# Two different broods from the same nest box, from two breeding periods
+thermal_df <- thermal_df %>%
+  mutate(Bird_box_ID = ifelse(Bird_box_ID == "V79" & Month == 4 & Day == 22 |
+                                Bird_box_ID == "V79" & Month == 4 & Day == 26, 
+                              paste0(Bird_box_ID, "b1"), Bird_box_ID))
+thermal_df <- thermal_df %>%
+  mutate(Bird_box_ID = ifelse(Bird_box_ID == "V79" & Month == 6 & Day == 14, 
+                              paste0(Bird_box_ID, "b2"), Bird_box_ID))
+
+# Add brood type (first or second)
+thermal_df <- thermal_df %>%
+  left_join(filed_report_data %>% select(Bird_box_ID, habitat), by = "Bird_box_ID")
+thermal_df <- thermal_df %>%
+  left_join(filed_report_data %>% select(Bird_box_ID, brood), by = "Bird_box_ID")
+thermal_df$brood <- ifelse(thermal_df$brood == 1, "First brood",
+                           ifelse(thermal_df$brood == 2, "Second brood", NA))
+
+# Format date
+thermal_df$Month <- sprintf("%02d", thermal_df$Month)
+thermal_df$Day <- sprintf("%02d", thermal_df$Day)
+thermal_df$Full_date <- paste(thermal_df$Year, thermal_df$Month, thermal_df$Day, 
+                              sep = "-")
+
+# Assign age categories based on date matching with field data
+thermal_df$age <- ifelse(thermal_df$Full_date %in% filed_report_data$first_date, 
+                         filed_report_data$first_bird_age[match(thermal_df$Full_date, filed_report_data$first_date)], 
+                         
+                         ifelse(thermal_df$Full_date %in% filed_report_data$second_date, 
+                                filed_report_data$second_bird_age[match(thermal_df$Full_date, filed_report_data$second_date)], 
+                                
+                                ifelse(thermal_df$Full_date %in% filed_report_data$third_date, 
+                                       filed_report_data$third_bird_age[match(thermal_df$Full_date, filed_report_data$third_date)], 
+                                       NA)))
+
+# Number of chicks based on date (lots of NA remain due to unmatched dates)
+thermal_df$bird_num <- ifelse(thermal_df$Full_date %in% filed_report_data$first_date,
+                         filed_report_data$first_bird_num[match(thermal_df$Full_date, filed_report_data$first_date)],
+
+                         ifelse(thermal_df$Full_date %in% filed_report_data$second_date,
+                                filed_report_data$second_bird_num[match(thermal_df$Full_date, filed_report_data$second_date)],
+
+                                ifelse(thermal_df$Full_date %in% filed_report_data$third_date,
+                                       filed_report_data$third_bird_num[match(thermal_df$Full_date, filed_report_data$third_date)],
+                                       NA)))
+
+table(thermal_df$bird_num)
+# Filter rows – many thermal images were taken, but only a subset is valid
+thermal_df <- thermal_df %>%
+  filter(!is.na(min_value_otsu)) # Filtering based on min_value_otsu, but any Otsu-derived value would work
+
+# Filter out a specific nest box if needed
+#thermal_df <- thermal_df[!thermal_df$Bird_box_info == "2_feszek", ]
+
+# Categorize chick ages into three classes
+thermal_df$age <- ifelse(thermal_df$age %in% c(1, 2, 3, 4, 5, 6), "Age up to 6", 
+                        ifelse(thermal_df$age %in% c(7, 8, 9, 10), "Age 8-10", 
+                              ifelse(thermal_df$age %in% c(11, 12, 13, 14, 15, 16), "Age 11-16",
+                                      thermal_df$age)))
+
+# Nest boxes L6 and L7 – treated as urban (Veszprém)
+thermal_df$habitat[thermal_df$habitat == "suburban"] <- "urban" # inkább volt urban
+thermal_df$Location[thermal_df$Location == "Laczko"] <- "Veszprem" 
+
+# Vilmapuszta location adjustment for boxes Vi14 & T18
+thermal_df[thermal_df$Bird_box_ID == "Vi14", "Location"] <- "Vilmapuszta"
+# There will now be two entries labelled "Vilmapuszta", probably one will need to be filtered out later
+
+# Drop unnecessary columns
+thermal_df <- thermal_df[ , !(names(thermal_df) %in% c("Emissivity", "Background", "Bird_box_info"))]
+
+# Rename some columns to clarify source (e.g., software-calculated points)
+names(thermal_df)[names(thermal_df) %in% c("Centerpoint", "Hotpoint", "Coldpoint")] <- 
+  c("Centerpoint_software", "Hotpoint_software", "Coldpoint_software")
+
+# Save the final dataset
+write.csv(thermal_df, "...:/.../thermal_data_with_field_data_ver2.csv",
+          row.names = FALSE)
