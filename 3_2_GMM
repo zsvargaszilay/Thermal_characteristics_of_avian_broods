@@ -1,0 +1,97 @@
+library(readr)
+library(dplyr)
+
+input_path <- "...:.../GMM_csv/"
+# Read all .csv files from the folder
+file_list <- list.files(path = input_path, pattern = ".csv$", full.names = TRUE)
+
+# Read and combine data into one data frame
+all_data <- lapply(file_list, function(file) {
+  data <- read_delim(file, delim = ",", col_names = FALSE)
+  data <- data[-1, ] # első sor eltávolítasa
+  values <- as.vector(as.matrix(data))
+  data.frame(filename = basename(file), value = values)
+}) %>% bind_rows()
+
+# Remove NaN values and calculate summary statistics
+summary_values <- all_data %>%
+  filter(!is.na(value)) %>%
+  group_by(filename) %>%
+  summarize(
+    min_value_GMM = min(value, na.rm = TRUE),             # Minimum
+    max_value_GMM = max(value, na.rm = TRUE),             # Maximum
+    median_value_GMM = median(value, na.rm = TRUE),       # Median
+    Q1_GMM = quantile(value, 0.25, na.rm = TRUE),         # First quartile (25th percentile)
+    Q3_GMM = quantile(value, 0.75, na.rm = TRUE),         # Third quartile (75th percentile)
+    P10_GMM = quantile(value, 0.10, na.rm = TRUE),        # 10th percentile
+    P90_GMM = quantile(value, 0.90, na.rm = TRUE)         # 90th percentile
+  ) %>%
+  mutate(across(where(is.numeric), ~round(.x, 2)))
+
+# Save the result to CSV
+output_file <- file.path(input_path, "GMM_results_summary.csv")
+#write_csv(summary_values, output_file)
+
+##########################################
+
+library(dplyr)
+
+thermal_df <- read.csv("d:/Work/Pannon_Uni_work/thermal_data_with_field_data_ver2.csv")
+GMM_df <- read.csv("d:/Work/Pannon_Uni_work/GMM_csv/GMM_results_summary.csv")
+
+# Remove the .csv extension
+GMM_df$filename <- sub("\\.csv$", "", GMM_df$filename)
+
+# Merge based on filename and File_name
+merged_df <- left_join(GMM_df, thermal_df, by = c("filename" = "File_name"))
+
+# Remove redundant filename column
+merged_df <- merged_df[ , !(names(merged_df) %in% "filename")]
+
+# Set new column order
+colnames(merged_df)
+new_order <- c("Image_ID", "Bird_box_ID", 
+               "Full_date", "Year", "Month", "Day",
+               "Location", "habitat", "brood", "age", "bird_num",
+               "min_value_otsu", "max_value_otsu", "median_value_otsu", 
+               "Q1_otsu", "Q3_otsu", "P10_otsu", "P90_otsu",
+               "min_value_GMM", "max_value_GMM", "median_value_GMM",
+               "Q1_GMM", "Q3_GMM", "P10_GMM", "P90_GMM",
+               "Centerpoint_software", "Hotpoint_software", "Coldpoint_software")
+
+# Reorder columns according to new order
+merged_df <- merged_df[, new_order]
+colnames(merged_df)
+
+# Final output file
+output_file <- file.path(input_path, "Otsu_and_GMM_and_field_data_df_ver2.csv")
+#write_csv(merged_df, output_file) 
+
+df <- read.csv("d:/Work/Pannon_Uni_work/GMM_csv/Otsu_and_GMM_and_field_data_df.csv")
+colnames(df)
+df[1,]
+unique(df$age)
+
+##########################################
+# Quick numerical comparison between Otsu and GMM methods
+# Create a vector of all numeric columns to summarize
+columns_to_summarize <- c(
+  "min_value_otsu", "max_value_otsu", "median_value_otsu",
+  "Q1_otsu", "Q3_otsu", "P10_otsu", "P90_otsu",
+  "min_value_GMM", "max_value_GMM", "median_value_GMM",
+  "Q1_GMM", "Q3_GMM", "P10_GMM", "P90_GMM"
+)
+
+# Calculate summary statistics
+summary_df <- df %>%
+  select(all_of(columns_to_summarize)) %>%
+  summarize(across(everything(), list(
+    min = ~min(. , na.rm = TRUE),
+    max = ~max(. , na.rm = TRUE),
+    mean = ~mean(. , na.rm = TRUE),
+    median = ~median(. , na.rm = TRUE)
+  )))
+
+# Save the summary to CSV
+# write.csv(summary_df, "...:/.../summary_results.csv", 
+#           row.names = FALSE)
