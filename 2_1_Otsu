@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt # for visualization
+import matplotlib.pyplot as plt # for visualisation
 #Python script
 
 # Input: A temperature matrix from a thermal camera in CSV format
@@ -32,21 +32,21 @@ for filename in os.listdir(input_path):
         # Clipping to the selected range
         clipped = np.clip(temperature_matrix, p_low, p_high)
 
-        # Normalization to 0-255
+        # Normalisation to 0-255
         normalized_matrix = ((clipped - p_low) / (p_high - p_low) * 255).astype(np.uint8)
 
-        # Normalization to 0-255 (previous version without transformation)
+        # Normalisation to 0-255 (previous version without transformation)
         # min_temp = np.nanmin(temperature_matrix)
         # max_temp = np.nanmax(temperature_matrix)
         # normalized_matrix = ((temperature_matrix - min_temp) / (max_temp - min_temp) * 255).astype(np.uint8)
 
-        # # Display histogram of the normalized image
+        # # Display histogram of the normalised image
         # plt.figure()
         # plt.title("Histogram of Normalized Matrix")
         # plt.hist(normalized_matrix.ravel(), bins=256, range=[0, 256])
         # plt.show()
 
-        # Otsu binarization
+        # Otsu binarisation
         otsu_thresh, binary_threshold = cv2.threshold(normalized_matrix, 0, 255,
                                                       cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
@@ -57,7 +57,7 @@ for filename in os.listdir(input_path):
         contours, _ = cv2.findContours(binary_threshold, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_SIMPLE)
 
-        # Initialize mask
+        # Initialise mask
         mask = np.zeros_like(binary_threshold)
         cv2.drawContours(mask, contours, -1, 255, thickness=cv2.FILLED)
 
