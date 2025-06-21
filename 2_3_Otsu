@@ -26,27 +26,39 @@ thermal_df$Day <- sprintf("%02d", thermal_df$Day)
 thermal_df$Full_date <- paste(thermal_df$Year, thermal_df$Month, thermal_df$Day, 
                               sep = "-")
 
-# Assign age categories based on date matching with field data
-thermal_df$age <- ifelse(thermal_df$Full_date %in% filed_report_data$first_date, 
-                         filed_report_data$first_bird_age[match(thermal_df$Full_date, filed_report_data$first_date)], 
-                         
-                         ifelse(thermal_df$Full_date %in% filed_report_data$second_date, 
-                                filed_report_data$second_bird_age[match(thermal_df$Full_date, filed_report_data$second_date)], 
-                                
-                                ifelse(thermal_df$Full_date %in% filed_report_data$third_date, 
-                                       filed_report_data$third_bird_age[match(thermal_df$Full_date, filed_report_data$third_date)], 
-                                       NA)))
+long_field_data <- filed_report_data %>%
+  pivot_longer(cols = c(first_date, second_date, third_date),
+               names_to = "date_type", values_to = "Full_date") %>%
+  mutate(age = case_when(
+    date_type == "first_date" ~ first_bird_age,
+    date_type == "second_date" ~ second_bird_age,
+    date_type == "third_date" ~ third_bird_age
+  )) %>%
+  select(Bird_box_ID, Full_date, age)
 
-# Number of chicks based on date (lots of NA remain due to unmatched dates)
-thermal_df$bird_num <- ifelse(thermal_df$Full_date %in% filed_report_data$first_date,
-                         filed_report_data$first_bird_num[match(thermal_df$Full_date, filed_report_data$first_date)],
+# Ensure Full_date is a character for matching
+long_field_data$Full_date <- as.character(long_field_data$Full_date)
+thermal_df$Full_date <- as.character(thermal_df$Full_date)
 
-                         ifelse(thermal_df$Full_date %in% filed_report_data$second_date,
-                                filed_report_data$second_bird_num[match(thermal_df$Full_date, filed_report_data$second_date)],
+# Join with thermal_df
+thermal_df <- left_join(thermal_df, long_field_data, by = c("Bird_box_ID", "Full_date"))
 
-                                ifelse(thermal_df$Full_date %in% filed_report_data$third_date,
-                                       filed_report_data$third_bird_num[match(thermal_df$Full_date, filed_report_data$third_date)],
-                                       NA)))
+long_birdnum_data <- filed_report_data %>%
+  pivot_longer(cols = c(first_date, second_date, third_date),
+               names_to = "date_type", values_to = "Full_date") %>%
+  mutate(bird_num = case_when(
+    date_type == "first_date" ~ first_bird_num,
+    date_type == "second_date" ~ second_bird_num,
+    date_type == "third_date" ~ third_bird_num
+  )) %>%
+  select(Bird_box_ID, Full_date, bird_num)
+
+# Ensure consistent date format
+long_birdnum_data$Full_date <- as.character(long_birdnum_data$Full_date)
+thermal_df$Full_date <- as.character(thermal_df$Full_date)
+
+# Join with the thermal_df to assign bird numbers
+thermal_df <- left_join(thermal_df, long_birdnum_data, by = c("Bird_box_ID", "Full_date"))
 
 table(thermal_df$bird_num)
 # Filter rows – many thermal images were taken, but only a subset is valid
@@ -56,7 +68,7 @@ thermal_df <- thermal_df %>%
 # Filter out a specific nest box if needed
 #thermal_df <- thermal_df[!thermal_df$Bird_box_info == "2_feszek", ]
 
-# Categorize chick ages into three classes
+# Categorise chick ages into three classes
 thermal_df$age <- ifelse(thermal_df$age %in% c(1, 2, 3, 4, 5, 6), "Age up to 6", 
                         ifelse(thermal_df$age %in% c(7, 8, 9, 10), "Age 8-10", 
                               ifelse(thermal_df$age %in% c(11, 12, 13, 14, 15, 16), "Age 11-16",
